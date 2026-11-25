@@ -25,6 +25,11 @@
 这一份给设计工作台的预览页用，改完顺手复制过去）。旧的独立目录归档在
 `~\.dsh\_archive\desktopcal-pre-v1\` 和 `plugins\_old-dsh-calendartask\`。
 
+**推 GitHub 用 `python tools\push.py`**：https → ssh(443) → REST API 三档依次试。
+教训是 2026-11-25 那次发版：`github.com:443` 间歇性断（直连超时、系统代理 6518 给 403），
+但 `api.github.com` 一直通；当时没先探测就直接绕 API，多花了半小时。
+现在探测 + 重试 + 三档回退都在脚本里，API 档会校验远端 SHA 与本地一致。
+
 ---
 
 ## 1. 用户到底要什么

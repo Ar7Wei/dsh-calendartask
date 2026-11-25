@@ -104,6 +104,20 @@ python tests/run.py --log out.txt
 
 78 项断言（库读写 / 投影 / 撞色 / 防误删 / 归档收投影）。测试只用 2027 年的空日子；如果你那几天本来就有内容，换一个测试日再跑。
 
+## 开发
+
+仓库根同时是技能目录和插件包，改 `client.js` 之后不需要同步第二份（只有设计工作台的预览页要手动复制一次）。
+
+推 GitHub 用 `tools/push.py`，它按 https → ssh(443) → REST API 三档依次尝试：
+
+```powershell
+python tools/push.py             # 平时用这个
+python tools/push.py --dry-run   # 只说会怎么走
+python tools/push.py --api       # 网络坏的时候直接走 API
+```
+
+为什么需要它：有的网络环境里 `github.com:443` 会间歇性断开（直连超时、走系统代理 403），但 `api.github.com` 仍然通。第三档用 `gh` 的凭据走 blobs → trees → commits → refs，并且会把提交对象（tree / 父提交 / 作者 / 时间 / 消息）逐字节重建，**远端 SHA 与本地一致**，不会留下"内容一样但历史分叉"的仓库。
+
 ## 已知限制
 
 - 只支持 Windows + DesktopCal 的原生库；换日历软件要重写 `projection.py`。
