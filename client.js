@@ -353,20 +353,16 @@ window.__ModuleLoader__.load({
 /* 底栏：一行一行的右对齐小字，像盖在页脚的印记——
    小字号、贴紧的行高、不抢眼，四行全部靠右，署名压在最底下。
    字号下限是 12px：再小对比度检查会拦，所以"小"靠 line-height 收紧和颜色变淡做。
-   字体：中文用楷体（Windows 自带 simkai），署名用 Gabriola（手写花体）。 */
+   字体跟面板一致（继承 .ctp 的默认无衬线），不另外指定。 */
 .ctp-more{display:flex;flex-direction:column;align-items:flex-end;gap:0;
   margin-top:auto;padding-top:8px;border-top:1px solid var(--line);
-  font-size:14px;line-height:1.25;color:var(--faint);text-align:right;
-  /* 四行统一一个字体、一个字号。楷体是本机唯一"中英文都有字形"的书法体，
-     Gabriola 只有拉丁字形（中文会掉回别的字体），所以这里换回楷体。 */
-  font-family:KaiTi,"楷体",STKaiti,"Kaiti SC",serif}
+  font-size:12px;line-height:1.25;color:var(--faint);text-align:right}
 .ctp-meta{display:flex;flex-direction:column;align-items:flex-end;gap:0;
   line-height:1.25;letter-spacing:.01em;min-width:0}
 .ctp-meta > span{min-width:0;max-width:100%;overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap}
 .ctp-flash{min-width:0;max-width:100%}
-.ctp-sign{margin:2px 0 0;white-space:nowrap;font-size:14px;line-height:1.25;
-  letter-spacing:.03em;color:var(--faint)}
+.ctp-sign{margin:2px 0 0;white-space:nowrap;letter-spacing:.03em;color:var(--faint)}
 .ctp-more .ctp-flash{color:var(--ink-2)}
 .ctp-more .ctp-flash[data-kind="err"]{color:var(--danger)}
 .ctp-emptyhint{padding:16px 2px;font-size:12px;color:var(--faint)}
