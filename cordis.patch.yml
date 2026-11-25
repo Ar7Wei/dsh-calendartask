@@ -1,0 +1,3 @@
+- insert:
+    - id: calendartask
+      name: '@local/dsh-calendartask'

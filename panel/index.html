@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CalendarTask · 配色登记</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #FAFAF9; }
+  /* 面板自己管宽度（max-width 640 居中），这里只给它一个满高度容器 */
+  #root { width: 100%; height: 100%; }
+  #boot {
+    margin: 24px; font: 13px/1.6 "Microsoft YaHei", system-ui, sans-serif;
+    color: #B42318; white-space: pre-wrap;
+  }
+  #boot code { background: #F2F2F4; padding: 1px 5px; border-radius: 4px; color: #3F3F46; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+/* 这个页面唯一的作用：在普通浏览器里把**同一个** client.js 挂起来。
+ *
+ * client.js 是给 DSH 的模块加载器写的（window.__ModuleLoader__.load），
+ * 所以这里补一个最小的加载器桩，把 react / react-dom 递给它，再渲染它导出的
+ * Panel。没有第二份面板代码 —— 之前这里放的是一份独立小应用，跟真面板各自
+ * 长各自的样，已经删掉了。
+ */
+window.__ModuleLoader__ = {
+  load(o) { window.__CT_FACTORY__ = o.factory; },
+};
+</script>
+<script src="/vendor/react.js"></script>
+<script src="/vendor/react-dom.js"></script>
+<script src="/client.js"></script>
+<script>
+(function () {
+  const fail = msg => document.body.insertAdjacentHTML('afterbegin',
+    '<div id="boot">面板没能挂起来：' + msg +
+    '\n如果这一行出现在侧栏里，检查 <code>/client.js</code> 是否 200。</div>');
+  try {
+    if (!window.__CT_FACTORY__) throw new Error('client.js 没有注册模块');
+    window.__CT_FACTORY__(name => {
+      if (name === 'react') return window.React;
+      if (name === 'react-dom') return window.ReactDOM;
+      throw new Error('没有这个模块：' + name);
+    });
+    window.ReactDOM.createRoot(document.getElementById('root'))
+      .render(window.React.createElement(window.__CT_PANEL__));
+  } catch (e) {
+    fail((e && e.message) ? e.message : String(e));
+  }
+})();
+</script>
+</body>
+</html>

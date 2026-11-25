@@ -1,0 +1,57 @@
+{
+  "name": "@local/dsh-calendartask",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "CalendarTask —— 桌面日历（DesktopCal）的配色登记面板：一件事一个颜色，按截止日铺底色。",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "dsh-bundle",
+    "desktopcal",
+    "calendar"
+  ],
+  "license": "MIT",
+  "author": "ArW",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ar7Wei/dsh-calendartask.git"
+  },
+  "homepage": "https://github.com/Ar7Wei/dsh-calendartask#readme",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "icon.svg",
+    "locale/*.json",
+    "SKILL.md",
+    "desktopcal.py",
+    "guard.py",
+    "panel/",
+    "docs/",
+    "tests/",
+    "README.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-sidebar-right"
+      ]
+    },
+    "manifestVersion": 1
+  },
+  "main": "index.js"
+}
