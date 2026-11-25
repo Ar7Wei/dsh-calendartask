@@ -267,6 +267,14 @@ def api_push(owner, repo, b, force=False, visibility="private"):
            {"sha": cm["sha"], "force": True}, method="PATCH")
     say("  分支 %s → %s" % (b, cm["sha"][:7]))
 
+    # 顺手把本地跟踪引用也对齐：网络断的时候 git status 会一直显示 [ahead N]，
+    # 其实远端早就是这个提交了。本地这个引用只是"已知远端在哪"的缓存。
+    try:
+        git("update-ref", "refs/remotes/origin/%s" % b, cm["sha"])
+        say("  本地 origin/%s 也对齐了（不然 git status 会一直显示 ahead）" % b)
+    except SystemExit:
+        pass
+
     for tag in [x.strip() for x in git("tag", "--points-at", head).splitlines() if x.strip()]:
         if gh("repos/%s/%s/git/ref/tags/%s" % (owner, repo, tag), allow_fail=True):
             continue
