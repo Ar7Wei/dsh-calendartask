@@ -71,7 +71,9 @@ def branch():
 
 
 # ---------- gh ----------------------------------------------------------------------
-def gh(path, payload=None, method=None, allow_fail=False):
+def gh(path, payload=None, method=None, allow_fail=False, missing_ok=False):
+    """missing_ok=True 只把 404 当"没有这个东西"；网络抖动之类的错误照样抛出来，
+    不然会把一次超时误判成"远端没有这个仓库"，然后做出更糟的事。"""
     cmd = ["gh", "api", path]
     if method:
         cmd += ["-X", method]
@@ -88,14 +90,17 @@ def gh(path, payload=None, method=None, allow_fail=False):
             os.remove(tmp)
     out = r.stdout.decode("utf-8", "replace").strip()
     if r.returncode != 0:
+        err = r.stderr.decode("utf-8", "replace").strip()
+        if missing_ok and ("HTTP 404" in err or "Not Found" in err):
+            return None
         if allow_fail:
             return None
-        raise SystemExit("gh api %s 失败：\n%s" % (path, r.stderr.decode("utf-8", "replace").strip()))
+        raise SystemExit("gh api %s 失败：\n%s" % (path, err))
     return json.loads(out) if out.startswith(("{", "[")) else out
 
 
 def remote_head(owner, repo, b):
-    ref = gh("repos/%s/%s/git/ref/heads/%s" % (owner, repo, b), allow_fail=True)
+    ref = gh("repos/%s/%s/git/ref/heads/%s" % (owner, repo, b), missing_ok=True)
     return ref["object"]["sha"] if ref else None
 
 
@@ -179,7 +184,7 @@ def ident(line):
 
 def api_push(owner, repo, b, force=False, visibility="private"):
     head = git("rev-parse", "HEAD")
-    if gh("repos/%s/%s" % (owner, repo), allow_fail=True) is None:
+    if gh("repos/%s/%s" % (owner, repo), missing_ok=True) is None:
         say("  远端还没有这个仓库，先建：gh repo create %s/%s --%s" % (owner, repo, visibility))
         rr = run(["gh", "repo", "create", "%s/%s" % (owner, repo), "--" + visibility], cwd=ROOT)
         if rr.returncode != 0:
@@ -276,7 +281,7 @@ def api_push(owner, repo, b, force=False, visibility="private"):
         pass
 
     for tag in [x.strip() for x in git("tag", "--points-at", head).splitlines() if x.strip()]:
-        if gh("repos/%s/%s/git/ref/tags/%s" % (owner, repo, tag), allow_fail=True):
+        if gh("repos/%s/%s/git/ref/tags/%s" % (owner, repo, tag), missing_ok=True):
             continue
         if git("cat-file", "-t", tag) == "tag":
             body = git("cat-file", "-p", tag, raw=True).decode("utf-8").split("\n\n", 1)
