@@ -137,7 +137,7 @@ def try_git_push(b, wait_s):
 def try_ssh_push(b):
     say("· 试 ssh（ssh.github.com:443）")
     cfg = "-c"
-    rw = "url.%sinsteadOf=https://github.com/" % SSH_BASE
+    rw = "url.%s.insteadOf=https://github.com/" % SSH_BASE
     try:
         r = run(["git", cfg, rw, "ls-remote", "--heads", "origin"], timeout=30, cwd=ROOT)
     except subprocess.TimeoutExpired:
