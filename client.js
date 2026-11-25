@@ -349,22 +349,13 @@ window.__ModuleLoader__.load({
 .ctp-addbtn{align-self:center;height:28px;margin:0 0 4px auto;padding:0 10px;
   border-radius:var(--r-sm);font-size:12px}
 
-/* 页脚 */
-/* 底栏：一行一行的右对齐小字，像盖在页脚的印记——
-   小字号、贴紧的行高、不抢眼，四行全部靠右，署名压在最底下。
-   字号下限是 12px：再小对比度检查会拦，所以"小"靠 line-height 收紧和颜色变淡做。
-   字体跟面板一致（继承 .ctp 的默认无衬线），不另外指定。 */
-.ctp-more{display:flex;flex-direction:column;align-items:flex-end;gap:0;
-  margin-top:auto;padding-top:8px;border-top:1px solid var(--line);
-  font-size:12px;line-height:1.25;color:var(--faint);text-align:right}
-.ctp-meta{display:flex;flex-direction:column;align-items:flex-end;gap:0;
-  line-height:1.25;letter-spacing:.01em;min-width:0}
-.ctp-meta > span{min-width:0;max-width:100%;overflow:hidden;
-  text-overflow:ellipsis;white-space:nowrap}
-.ctp-flash{min-width:0;max-width:100%}
-.ctp-sign{margin:2px 0 0;white-space:nowrap;letter-spacing:.03em;color:var(--faint)}
-.ctp-more .ctp-flash{color:var(--ink-2)}
-.ctp-more .ctp-flash[data-kind="err"]{color:var(--danger)}
+/* 页脚：现在只剩临时消息（"已保存"、冲突提示这类），正常状态下不占位置、不画线。
+   以前这里是一竖列右对齐的小字（上次写入 / 数据 / 备份 / 署名），用户 2026-11-25 让去掉。 */
+.ctp-flashrow{margin-top:auto;padding-top:8px;display:flex;
+  flex-direction:column;align-items:flex-end;font-size:12px;line-height:1.25;
+  text-align:right}
+.ctp-flash{min-width:0;max-width:100%;color:var(--ink-2)}
+.ctp-flash[data-kind="err"]{color:var(--danger)}
 .ctp-emptyhint{padding:16px 2px;font-size:12px;color:var(--faint)}
 
 /* 未分类：日历上有正文、但还没归到任何事项的那些行。
@@ -504,8 +495,6 @@ window.__ModuleLoader__.load({
       const [plain, setPlain] = useState({});        // {日期: [还没上色的正文行]}
       const [plainOpen, setPlainOpen] = useState(null); // 哪个标签页里的未分类展开着
       const [plainDrag, setPlainDrag] = useState(null); // 正拖着的那一行 {iso,text}
-      const [lastWrite, setLastWrite] = useState(null);  // 上次真正写进日历的时刻
-      const [paths, setPaths] = useState(null);          // 数据 / 备份的真实路径（只用于 tooltip）
       const pendingSave = useRef(null);
       const timer = useRef(null);
       const revRef = useRef(null);          // 读到的那份登记表指纹，保存时带上
@@ -574,8 +563,6 @@ window.__ModuleLoader__.load({
           setArchived(j.archived || 0);
           setPending(!!j.pending);
           setReleased(j.released || []);
-          setLastWrite(j.lastWrite || null);
-          setPaths(j.paths || null);
           revRef.current = j.rev || null;
           if (j.justArchived) flash('本次归档 ' + j.justArchived + ' 条');
         } catch (e) {
@@ -1021,13 +1008,6 @@ window.__ModuleLoader__.load({
         h('span', { className: 'ctp-chev' }));
 
       const flashing = msg.text;
-      /* 「上次写入」写成「今天 21:15」/「11/24 21:15」；没写过就明说 */
-      const lastWriteLabel = (() => {
-        const m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})/.exec(lastWrite || '');
-        if (!m) return null;
-        const same = (m[1] + '-' + m[2] + '-' + m[3]) === localISO();
-        return (same ? '今天 ' : (+m[2]) + '/' + (+m[3]) + ' ') + m[4] + ':' + m[5];
-      })();
 
       /* 未分类按日期分到两个标签页：今天及以后算"进行中"，过去的算"已归档" */
       const todayIso = localISO();
@@ -1176,19 +1156,8 @@ window.__ModuleLoader__.load({
                 unclassified('archive') ? [unclassified('archive')] : [])
               : h('div', { className: 'ctp-emptyhint' }, '没有归档')),
 
-        h('div', { className: 'ctp-more' },
-          flashing
-            ? h('span', { className: 'ctp-flash', 'data-kind': msg.kind }, flashing)
-            : h('span', {
-              className: 'ctp-meta',
-              title: '数据：' + ((paths && paths.state) || '~/.dsh/state')
-                + '\n备份：' + ((paths && paths.backup) || '~/.dsh/backups')
-                + '（每次写日历之前自动备份）',
-            },
-              h('span', null, lastWriteLabel ? '上次写入 ' + lastWriteLabel : '还没写入过'),
-              h('span', null, '数据 ~/.dsh/state'),
-              h('span', null, '备份 ~/.dsh/backups')),
-          h('span', { className: 'ctp-sign' }, 'Powered by ArW')),
+        flashing ? h('div', { className: 'ctp-flashrow' },
+          h('span', { className: 'ctp-flash', 'data-kind': msg.kind }, flashing)) : null,
         delAsk ? h('div', {
           className: 'ctp-modal', role: 'dialog', 'aria-modal': 'true', 'aria-label': '删除确认',
           onKeyDown: e => {
