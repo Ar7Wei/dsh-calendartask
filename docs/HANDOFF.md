@@ -9,8 +9,21 @@
 
 ## 一句话现状
 
-**能力齐了、面板上线了、日历本身还没真正排过一次计划。**
-写日历的 CLI、颜色面板（独立页 + DSH 右侧栏插件）都能用；下一步就是拿真实场景（找工作、篮球）跑一遍写入。
+**能力齐了、面板上线了、v1.0 已发布到 GitHub：<https://github.com/Ar7Wei/dsh-calendartask>**
+写日历的 CLI、颜色面板（DSH 右侧栏 + 浏览器同一个 `client.js`）都能用；日历本身还没真正排过一次计划。
+
+安装形态（2026-11-25 整理之后）：
+
+| 东西 | 现在是什么 |
+|---|---|
+| 仓库 | `E:\DSH-workplace\default\dsh-calendartask`（git，tag `v1.0.0`） |
+| 技能目录 | `~\.dsh\skills\desktopcal` → **junction** 指向仓库根 |
+| profile 里的包 | `~\.dsh\profiles\desktop\node_modules\@local\dsh-calendartask` → 同一个 junction |
+| 面板服务 | 插件启动时 `panel\server.py --port 8777` |
+
+所以**改仓库就是改线上**，不再有第二、第三份 `client.js`（只有 `design\dc-panel\vendor\ct-client.js`
+这一份给设计工作台的预览页用，改完顺手复制过去）。旧的独立目录归档在
+`~\.dsh\_archive\desktopcal-pre-v1\` 和 `plugins\_old-dsh-calendartask\`。
 
 ---
 
