@@ -217,65 +217,96 @@ def api_push(owner, repo, b, force=False, visibility="private"):
         }, method="PUT")
         parents = [put["commit"]["sha"]]
 
-    entries = []
-    listing = git("ls-tree", "-r", "-z", "HEAD", raw=True).decode("utf-8")
-    for item in listing.split("\x00"):
-        if not item.strip():
-            continue
-        meta, path = item.split("\t", 1)
-        mode, typ, sha = meta.split(" ")
-        blob = gh("repos/%s/%s/git/blobs" % (owner, repo), {
-            "content": base64.b64encode(git("cat-file", "-p", sha, raw=True)).decode(),
-            "encoding": "base64",
+    # 要补哪些提交：远端已有的那个之后的所有提交，按时间顺序建
+    if rh:
+        try:
+            todo = [x.strip() for x in git("rev-list", "--reverse", "%s..HEAD" % rh).splitlines()
+                    if x.strip()]
+        except SystemExit:
+            raise SystemExit("本地不认识远端那个提交（%s），先 git fetch 一次再来。" % rh[:7])
+    else:
+        todo = [x.strip() for x in git("rev-list", "--reverse", "HEAD").splitlines() if x.strip()]
+    if not todo:
+        say("  本地没有比远端新的提交，不用推。")
+        return True
+    say("  要补 %d 个提交" % len(todo))
+
+    boot_parent = None
+    if rh is None:
+        say("  空仓库，先造一个根提交（GitHub 不允许往空仓库建 blob）")
+        put = gh("repos/%s/%s/contents/README.md" % (owner, repo), {
+            "message": "chore: 初始化仓库",
+            "content": base64.b64encode(("# %s\n" % repo).encode()).decode(),
+        }, method="PUT")
+        boot_parent = put["commit"]["sha"]
+
+    uploaded = set()
+    last = None
+    for n, sha in enumerate(todo, 1):
+        # 注意：提交消息要连末尾换行一起原样带上，少一个字节 SHA 就不一样
+        text = git("cat-file", "commit", sha, raw=True).decode("utf-8")
+        header, message = text.split("\n\n", 1)
+        tree = author = committer = None
+        parents = []
+        for line in header.splitlines():
+            key, _, val = line.partition(" ")
+            if key == "tree":
+                tree = val
+            elif key == "parent":
+                parents.append(val)
+            elif key == "author":
+                author = val
+            elif key == "committer":
+                committer = val
+
+        entries = []
+        listing = git("ls-tree", "-r", "-z", sha, raw=True).decode("utf-8")
+        for item in listing.split("\x00"):
+            if not item.strip():
+                continue
+            meta, path = item.split("\t", 1)
+            mode, typ, blob_sha = meta.split(" ")
+            if blob_sha not in uploaded:
+                blob = gh("repos/%s/%s/git/blobs" % (owner, repo), {
+                    "content": base64.b64encode(git("cat-file", "-p", blob_sha, raw=True)).decode(),
+                    "encoding": "base64",
+                }, method="POST")
+                if blob["sha"] != blob_sha:
+                    raise SystemExit("blob sha 不一致：%s" % path)
+                uploaded.add(blob_sha)
+            entries.append({"path": path, "mode": mode, "type": typ, "sha": blob_sha})
+
+        t = gh("repos/%s/%s/git/trees" % (owner, repo), {"tree": entries}, method="POST")
+        if t["sha"] != tree:
+            raise SystemExit("tree sha 不一致：%s ≠ %s" % (t["sha"], tree))
+
+        if n == 1 and boot_parent:
+            parents = [boot_parent]
+        cm = gh("repos/%s/%s/git/commits" % (owner, repo), {
+            "message": message, "tree": t["sha"], "parents": parents,
+            "author": ident(author), "committer": ident(committer),
         }, method="POST")
-        if blob["sha"] != sha:
-            raise SystemExit("blob sha 不一致：%s" % path)
-        entries.append({"path": path, "mode": mode, "type": typ, "sha": sha})
-    say("  上传 %d 个文件内容" % len(entries))
-
-    # 注意：消息要连末尾换行一起原样带上，少一个字节 SHA 就不一样
-    text = git("cat-file", "commit", "HEAD", raw=True).decode("utf-8")
-    header, message = text.split("\n\n", 1)
-    tree = author = committer = None
-    local_parents = []
-    for line in header.splitlines():
-        key, _, val = line.partition(" ")
-        if key == "tree":
-            tree = val
-        elif key == "parent":
-            local_parents.append(val)
-        elif key == "author":
-            author = val
-        elif key == "committer":
-            committer = val
-    if rh is None and local_parents:
-        raise SystemExit("本地这个提交有父提交，但远端是空仓库 —— 先把父提交也推上去。")
-
-    t = gh("repos/%s/%s/git/trees" % (owner, repo), {"tree": entries}, method="POST")
-    if t["sha"] != tree:
-        raise SystemExit("tree sha 不一致：%s ≠ %s" % (t["sha"], tree))
-
-    cm = gh("repos/%s/%s/git/commits" % (owner, repo), {
-        "message": message, "tree": t["sha"], "parents": parents or local_parents,
-        "author": ident(author), "committer": ident(committer),
-    }, method="POST")
-    if cm["sha"] != head:
-        raise SystemExit(
-            "提交对象的 SHA 和本地对不上（远端 %s / 本地 %s），没有动远端分支。\n"
-            "一般是消息末尾换行或时区被改了，把这条输出发给我。" % (cm["sha"][:7], head[:7]))
+        if cm["sha"] != sha:
+            raise SystemExit(
+                "提交对象的 SHA 和本地对不上（远端 %s / 本地 %s），没有动远端分支。\n"
+                "一般是消息末尾换行或时区被改了，把这条输出发给我。" % (cm["sha"][:7], sha[:7]))
+        last = cm["sha"]
+        say("  [%d/%d] %s %s" % (n, len(todo), sha[:7],
+                                 message.splitlines()[0][:48] if message.strip() else ""))
 
     if rh is None:
         gh("repos/%s/%s/git/refs" % (owner, repo),
-           {"ref": "refs/heads/" + b, "sha": cm["sha"]}, method="POST")
+           {"ref": "refs/heads/" + b, "sha": last}, method="POST")
     else:
         gh("repos/%s/%s/git/refs/heads/%s" % (owner, repo, b),
-           {"sha": cm["sha"], "force": True}, method="PATCH")
-    say("  分支 %s → %s" % (b, cm["sha"][:7]))
+           {"sha": last, "force": True}, method="PATCH")
+    say("  分支 %s → %s" % (b, last[:7]))
+    head = last
 
     # 顺手把本地跟踪引用也对齐：网络断的时候 git status 会一直显示 [ahead N]，
     # 其实远端早就是这个提交了。本地这个引用只是"已知远端在哪"的缓存。
     try:
-        git("update-ref", "refs/remotes/origin/%s" % b, cm["sha"])
+        git("update-ref", "refs/remotes/origin/%s" % b, head)
         say("  本地 origin/%s 也对齐了（不然 git status 会一直显示 ahead）" % b)
     except SystemExit:
         pass
