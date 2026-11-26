@@ -677,6 +677,27 @@ DesktopCal 的格子是**按行**存的。"铺底色 → 清底色"之后会留�
 已从 `~/.dsh/backups/desktopcal/calendar.db.20261125-215723.bak` 把那一行（含 826 字节 `it_history`）整行恢复，前后内容逐字一致。
 **规矩**：测试数据只用"空日子"（`2027-*`），`add-day` 往已有内容的格子加东西 + 之后 `del-day --force`，等于把用户内容一起删。
 
+### 插件市场报「包元信息错误」（2026-11-26，已修）
+
+症状：市场里 `@local/dsh-calendartask` 没有名字/描述，只有一行
+
+```
+包元信息错误：Plugin metadata for @local/dsh-calendartask: Error: ...locale\en.json:
+SyntaxError: Unexpected token '﻿', "﻿{ "meta"..." is not valid JSON
+```
+
+原因：`locale/en.json`、`locale/zh.json` 从 v1 第一个提交起就带着 **UTF-8 BOM**（`EF BB BF`）。
+DSH 读元信息走 `readPluginMeta()` → `JSON.parse(readFileSync(file, "utf8"))`，**不剥 BOM**，
+于是 `dictionariesOf()` 读到第一个语言文件就抛错，整条元信息（标题 / 描述 / 图标）退回
+`{ error: "Plugin metadata for ..." }`。坏的只是市场里那一栏：插件本身照常加载，`list_plugins` 里
+`include:calendartask` 一直是 `active`。
+
+修（`ffceeae`）：两个文件去掉 BOM；`tests/run.py` 开跑第 0 步检查 `package.json` + `locale/*.json`
+——开头不能有 BOM、必须能 `json.loads`，坏了直接 FAIL。
+
+记住：Windows 上 PowerShell 5.1 的 `Set-Content -Encoding utf8` 会悄悄加 BOM，改这类文件用编辑器或
+`UTF8Encoding($false)`；市场那栏是每次现读（`readPluginMeta` 没有缓存），文件改好后刷新页面即可。
+
 ---
 
 ## 9. 常用操作
