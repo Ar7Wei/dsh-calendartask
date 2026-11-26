@@ -7,7 +7,8 @@
     python tests/run.py --keep     # 留着临时目录，方便看现场
     python tests/run.py --log x.txt  # 另存一份 UTF-8 结果
 
-它做四件事：
+它做五件事：
+  0. 检查 package.json / locale/*.json 的编码（不能带 BOM，必须是合法 JSON）；
   1. 用 sqlite 的 backup 把真库复制一份（原库只读打开，WAL 里没落盘的也能带上）；
   2. 造一个空的 state 目录 —— 登记表 / 归档 / 已释放 / 快照 / 审计全写在那里；
   3. 用 CALENDARTASK_DB / CALENDARTASK_STATE / CALENDARTASK_BACKUP 起一个独立端口的服务；
@@ -19,6 +20,7 @@
 """
 import argparse
 import io
+import json
 import os
 import shutil
 import sqlite3
@@ -76,12 +78,49 @@ def healthy(port):
         return False
 
 
+def check_manifest():
+    """插件市场要读的几处 JSON：不能带 BOM，且必须能解析。
+
+    DSH 那边是 JSON.parse(readFile(...)) —— 文件开头一个 UTF-8 BOM 就会让整条
+    元信息报 “Unexpected token '\\ufeff'”，市场里插件名/描述/图标全空。
+    Windows 上 PowerShell 5.1 的 Set-Content -Encoding utf8 会悄悄加 BOM，
+    所以这里每次跑测试都盯一眼。
+    """
+    bad = 0
+    targets = [os.path.join(ROOT, "package.json")]
+    loc = os.path.join(ROOT, "locale")
+    if os.path.isdir(loc):
+        targets += [os.path.join(loc, n) for n in sorted(os.listdir(loc)) if n.endswith(".json")]
+
+    for path in targets:
+        rel = os.path.relpath(path, ROOT)
+        with open(path, "rb") as f:
+            raw = f.read()
+        if raw.startswith(b"\xef\xbb\xbf"):
+            say("FAIL 清单编码 %s：开头有 UTF-8 BOM，插件市场会报 JSON 解析错误" % rel)
+            bad += 1
+            continue
+        try:
+            json.loads(raw.decode("utf-8"))
+        except Exception as exc:
+            say("FAIL 清单编码 %s：%s" % (rel, exc))
+            bad += 1
+            continue
+        say("OK   清单编码 %s" % rel)
+    return bad
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8799)
     ap.add_argument("--keep", action="store_true")
     ap.add_argument("--log", help="把这些输出另存一份 UTF-8 文本（看结果用）")
     a = ap.parse_args()
+
+    say("=" * 72)
+    say("清单 / 元信息")
+    say("=" * 72)
+    failed = check_manifest()
 
     src = real_db()
     if not os.path.exists(src):
@@ -113,7 +152,6 @@ def main():
         [sys.executable, os.path.join(ROOT, "panel", "server.py"), "--port", str(a.port)],
         env=env, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
     )
-    failed = 0
     try:
         for _ in range(40):
             if healthy(a.port):
